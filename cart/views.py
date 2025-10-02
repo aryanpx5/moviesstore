@@ -56,7 +56,8 @@ def purchase(request):
         item.save()
 
     request.session['cart'] = {}
-    template_data = {}
-    template_data['title'] = 'Purchase confirmation'
-    template_data['order_id'] = order.id
-    return render(request, 'cart/purchase.html', {'template_data': template_data})
+    
+
+    request.session['last_order_id'] = order.id
+    
+    return redirect('checkout_success')
