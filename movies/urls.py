@@ -10,4 +10,7 @@ urlpatterns = [
     path('checkout/success/', views.checkout_success, name='checkout_success'),
     path('checkout/feedback/submit/', views.submit_feedback, name='submit_feedback'),
     path('feedback/', views.feedback_list, name='feedback_list'),
+    path('petitions/', views.petition_list, name='petition_list'),
+    path('petitions/create/', views.create_petition, name='create_petition'),
+    path('petitions/<int:petition_id>/vote/', views.vote_petition, name='vote_petition'),
 ]

@@ -1,11 +1,12 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from .models import Movie, Review, CheckoutFeedback
-from .forms import CheckoutFeedbackForm
+from .models import Movie, Review, CheckoutFeedback, MoviePetition, PetitionVote
+from .forms import CheckoutFeedbackForm, MoviePetitionForm
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib import messages
+from django.db.models import Count
 
 def index(request):
     search_term = request.GET.get('search')
@@ -67,7 +68,7 @@ def delete_review(request, id, review_id):
     review.delete()
     return redirect('movies.show', id=id)
 
-# NEW CHECKOUT FEEDBACK VIEWS
+# CHECKOUT FEEDBACK VIEWS
 def checkout_success(request):
     """View that shows after successful checkout - displays the feedback popup"""
     form = CheckoutFeedbackForm()
@@ -102,3 +103,55 @@ def feedback_list(request):
         'feedbacks': feedbacks
     }
     return render(request, 'checkout/feedback_list.html', context)
+
+# MOVIE PETITION VIEWS
+@login_required
+def petition_list(request):
+    """Display all movie petitions sorted by vote count"""
+    petitions = MoviePetition.objects.annotate(
+        vote_count=Count('votes')
+    ).order_by('-vote_count', '-created_at')
+    
+    # Get petitions user has voted on
+    user_votes = PetitionVote.objects.filter(user=request.user).values_list('petition_id', flat=True)
+    
+    context = {
+        'petitions': petitions,
+        'user_votes': list(user_votes)
+    }
+    return render(request, 'movies/petitions.html', context)
+
+@login_required
+def create_petition(request):
+    """Create a new movie petition"""
+    if request.method == 'POST':
+        form = MoviePetitionForm(request.POST)
+        if form.is_valid():
+            petition = form.save(commit=False)
+            petition.created_by = request.user
+            petition.save()
+            messages.success(request, 'Petition created successfully!')
+            return redirect('petition_list')
+    else:
+        form = MoviePetitionForm()
+    
+    return render(request, 'movies/create_petition.html', {'form': form})
+
+@login_required
+def vote_petition(request, petition_id):
+    """Toggle vote on a petition"""
+    petition = get_object_or_404(MoviePetition, id=petition_id)
+    
+    # Check if user already voted
+    existing_vote = PetitionVote.objects.filter(petition=petition, user=request.user).first()
+    
+    if existing_vote:
+        # Remove vote
+        existing_vote.delete()
+        messages.info(request, 'Vote removed!')
+    else:
+        # Add vote
+        PetitionVote.objects.create(petition=petition, user=request.user)
+        messages.success(request, 'Vote added!')
+    
+    return redirect('petition_list')
